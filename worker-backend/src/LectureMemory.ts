@@ -25,40 +25,76 @@ export class LectureMemory {
     const url = new URL(request.url);
     const path = url.pathname;
 
+    // Debug endpoint to check history
+    if (path === '/debug/history' && request.method === 'GET') {
+      const HISTORY_KEY = "chat_history";
+      const history = (await this.state.storage.get<ChatHistory>(HISTORY_KEY)) || {messages: []};
+      return new Response(JSON.stringify({
+        history: history.messages,
+        count: history.messages.length
+      }), {
+        headers: {'Content-Type': 'application/json'}
+      });
+    }
+
     // Chat endpoint
     if (path === '/chat' && request.method === 'POST') {
       try {
         const { message } = (await request.json()) as ChatRequest;
 
-        // Define the storage key for the chat history
+        // 1. Define the storage key for the chat history
         const HISTORY_KEY = "chat_history";
 
-        // Retrieve the existing history (or initialize if there is not)
+        // 2. Retrieve the existing history (or initialize if there is not)
         let history = (await this.state.storage.get<ChatHistory>(HISTORY_KEY)) || {messages: []};
 
-        // Append the new user message
+        // 3. Append the new user message
         const userMessage: ChatMessage = {
           role: 'user',
           content: message,
           timestamp: Date.now()
         };
 
-        // Add the user message to the history
+        // 4. Add the user message to the history
         history.messages.push(userMessage);
 
-        // Save the updated history back to storage
+        // 5. Save the updated history back to storage
         await this.state.storage.put(HISTORY_KEY, history);
 
-        // return new Response(JSON.stringify({
-        //   response: `Received message: "${message}". Ready for memory implementation.`,
-        //   doId: this.state.id.toString()
-        // }), {
-        //   headers: { 'Content-Type': 'application/json' },
-        // });
+        // 6. Construct the AI prompt that use the history
+        const systemPrompt = "You are LectureLens, an AI-powered study assistant. Your goal is to answer question strictly based on the provided conversation history and lecture context. Respond concisely and helpfully.";
 
+        // 7. Map the history to the format required by the AI model
+        const aiMessage = history.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
+        // 8. Prepend the system prompt
+        const messages = [
+          {role: 'system', content: systemPrompt},
+          ...aiMessage
+        ]
+
+        // 9. Call the Workers AI binding
+        const model = '@cf/meta/llama-3-8b-instruct';
+        const aiResponse = await this.env.AI.run(model, {messages});
+
+        const assistantResponse = aiResponse.response;
+
+        // 10. Append the AI's response to the history and save it
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: assistantResponse,
+          timestamp: Date.now()
+        };
+
+        history.messages.push(assistantMessage);
+        await this.state.storage.put(HISTORY_KEY, history);
+
+        // 11. Return the AI's response to the user
         return new Response(JSON.stringify({
-          response: "User message saved to history.",
-          history: history.messages,
+          response: assistantResponse,
           doId: this.state.id.toString()
         }), {
           headers: {'Content-Type': 'application/json'}
