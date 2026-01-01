@@ -1,0 +1,1 @@
+This is the first line of the lecture transcript. It talks about Cloudflare Workers and Durable Objects.
