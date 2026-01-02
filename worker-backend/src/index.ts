@@ -133,13 +133,34 @@ export default {
         // 4. Read the file content as text
         const lectureText = await file.text();
 
-        // 5. For now, log the first 100 characters of the file content and return a success response
-        console.log(`Received file: ${file.name}. Content preview: ${lectureText.substring(0, 100)}...`);
+        // After read the file content as text, we will generate a unique ID for it
+        const lectureId = crypto.randomUUID();
+
+        // Get the Durable Object and stub for the lectureId
+        const id = env.LECTURE_MEMORY.idFromName(lectureId);
+        const stub = env.LECTURE_MEMORY.get(id);
+        
+        // Prepare the Request Body for the DO
+        const doBody = JSON.stringify({lectureText: lectureText});
+
+        // Construct and Send the Request Body to the DO's /lecture endpoint
+        const doResponse = await stub.fetch("https://do-placeholder/lecture", {
+          method: "POST",
+          headers: {'Content-Type': 'application/json'},
+          body: doBody
+        })
+
+        // Check the DO's response status
+        if (!doResponse.ok){
+          const errorText = await doResponse.text();
+          console.log('DO Storage Failed: ', errorText);
+          return new Response(`Failed to store lecture in memory: ${errorText}`);
+        }
 
         return new Response(JSON.stringify({
-          message: 'File uploaded successfully',
-          filename: file.name,
-          contentLength: lectureText.length,
+          message: 'File received and stored successfully',
+          lectureId: lectureId,
+          fileName: file.name,
         }), {
           headers: { 'Content-Type': 'application/json' },
         });
