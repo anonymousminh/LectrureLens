@@ -19,6 +19,20 @@ interface Env {
 
 export { LectureMemory };
 
+// Helper function to add CORS headers to any response
+function addCorsHeaders(response: Response): Response {
+  const newHeaders = new Headers(response.headers);
+  newHeaders.set('Access-Control-Allow-Origin', '*');
+  newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type');
+  
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
+  });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
@@ -31,7 +45,7 @@ export default {
       const lectureId = segments[2];
 
       if (!lectureId) {
-        return new Response('Missing lecture ID in path.', { status: 400 });
+        return addCorsHeaders(new Response('Missing lecture ID in path.', { status: 400 }));
       }
 
       // Get the Durable Object ID and stub using the lectureId
@@ -65,17 +79,17 @@ export default {
           timeoutPromise
         ]);
         
-        return doResponse;
+        return addCorsHeaders(doResponse);
       } catch (error) {
         console.error('Error calling Durable Object:', error);
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return new Response(JSON.stringify({
+        return addCorsHeaders(new Response(JSON.stringify({
           error: 'Failed to reach Durable Object',
           details: errorMessage
         }), {
           status: 500,
           headers: { 'Content-Type': 'application/json' }
-        });
+        }));
       }
     }
 
@@ -85,7 +99,7 @@ export default {
         const { text } = await request.json() as { text?: string };
 
         if (!text) {
-          return new Response('Missing "text" in request body', { status: 400 });
+          return addCorsHeaders(new Response('Missing "text" in request body', { status: 400 }));
         }
 
         const systemPrompt = "You are a helpful study assistant. Summarize the following lecture transcript into clear, structured key points. Use Markdown formatting for readability.";
@@ -101,13 +115,13 @@ export default {
 
         const summary = response.response;
 
-        return new Response(JSON.stringify({ summary }), {
+        return addCorsHeaders(new Response(JSON.stringify({ summary }), {
           headers: { 'Content-Type': 'application/json' },
-        });
+        }));
 
       } catch (error) {
         console.error('Summarization Error:', error);
-        return new Response('Internal Server Error during summarization.', { status: 500 });
+        return addCorsHeaders(new Response('Internal Server Error during summarization.', { status: 500 }));
       }
     }
 
@@ -117,7 +131,7 @@ export default {
         // 1. Check the content type to ensure it's a file upload
         const contentType = request.headers.get('Content-Type');
         if (!contentType || ! contentType.includes('multipart/form-data')) {
-          return new Response('Invalid content type. Expected multipart/form-data.', { status: 400 });
+          return addCorsHeaders(new Response('Invalid content type. Expected multipart/form-data.', { status: 400 }));
         }
 
         // 2. Parse the multipart form data
@@ -127,7 +141,7 @@ export default {
         const file = formData.get('lectureFile');
 
         if (!file || typeof file === 'string') {
-          return new Response('No file uploaded or invalid file type.', { status: 400 });
+          return addCorsHeaders(new Response('No file uploaded or invalid file type.', { status: 400 }));
         }
 
         // 4. Read the file content as text
@@ -154,19 +168,19 @@ export default {
         if (!doResponse.ok){
           const errorText = await doResponse.text();
           console.log('DO Storage Failed: ', errorText);
-          return new Response(`Failed to store lecture in memory: ${errorText}`);
+          return addCorsHeaders(new Response(`Failed to store lecture in memory: ${errorText}`, { status: 500 }));
         }
 
-        return new Response(JSON.stringify({
+        return addCorsHeaders(new Response(JSON.stringify({
           message: 'File received and stored successfully',
           lectureId: lectureId,
           fileName: file.name,
         }), {
           headers: { 'Content-Type': 'application/json' },
-        });
+        }));
       } catch (error) {
         console.error('File Upload Error:', error);
-        return new Response('Internal Server Error during file upload.', { status: 500 });
+        return addCorsHeaders(new Response('Internal Server Error during file upload.', { status: 500 }));
       }
     }
 
@@ -184,10 +198,10 @@ export default {
 
     // Root Endpoint
     if (path === '/' && request.method === 'GET') {
-      return new Response('LectureLens API is running!', { status: 200 });
+      return addCorsHeaders(new Response('LectureLens API is running!', { status: 200 }));
     }
 
     // 404 Fallback
-    return new Response('Not Found.', { status: 404 });
+    return addCorsHeaders(new Response('Not Found.', { status: 404 }));
   },
 };
