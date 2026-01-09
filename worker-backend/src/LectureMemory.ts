@@ -53,28 +53,37 @@ export class LectureMemory {
         // 5. Save the updated history back to storage
         await this.state.storage.put(HISTORY_KEY, history);
 
-        // 6. Construct the AI prompt that use the history
-        const systemPrompt = "You are LectureLens, an AI-powered study assistant. Your goal is to answer question strictly based on the provided conversation history and lecture context. Respond concisely and helpfully.";
+        // 6. Retrieve the lecture content from storage
+        const LECTURE_KEY = "raw_lecture_text";
+        const lectureContent = await this.state.storage.get<string>(LECTURE_KEY);
 
-        // 7. Map the history to the format required by the AI model
+        // 7. Construct the AI prompt that includes the lecture context
+        let systemPrompt = "You are LectureLens, an AI-powered study assistant. Your goal is to answer questions based on the provided lecture content and conversation history. Respond concisely and helpfully.";
+        
+        // If lecture content exists, add it to the system prompt
+        if (lectureContent) {
+          systemPrompt += `\n\nHere is the lecture content:\n\n${lectureContent}`;
+        }
+
+        // 8. Map the history to the format required by the AI model
         const aiMessage = history.messages.map(msg => ({
           role: msg.role,
           content: msg.content
         }));
 
-        // 8. Prepend the system prompt
+        // 9. Prepend the system prompt
         const messages = [
           {role: 'system', content: systemPrompt},
           ...aiMessage
         ]
 
-        // 9. Call the Workers AI binding
+        // 10. Call the Workers AI binding
         const model = '@cf/meta/llama-3-8b-instruct';
         const aiResponse = await this.env.AI.run(model, {messages});
 
         const assistantResponse = aiResponse.response;
 
-        // 10. Append the AI's response to the history and save it
+        // 11. Append the AI's response to the history and save it
         const assistantMessage: ChatMessage = {
           role: 'assistant',
           content: assistantResponse,
@@ -84,7 +93,7 @@ export class LectureMemory {
         history.messages.push(assistantMessage);
         await this.state.storage.put(HISTORY_KEY, history);
 
-        // 11. Return the AI's response to the user
+        // 12. Return the AI's response to the user
         return new Response(JSON.stringify({
           response: assistantResponse,
           doId: this.state.id.toString()
