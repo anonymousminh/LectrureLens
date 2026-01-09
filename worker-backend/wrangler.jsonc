@@ -39,7 +39,7 @@
 	 */
 	// "services": [  {   "binding": "MY_SERVICE",   "service": "my-service"  } ]
 	"ai":{
-		"binding": "AI",
+		"binding": "AI"
 	},
 	"durable_objects": {
 		"bindings": [{
