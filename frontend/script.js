@@ -3,9 +3,9 @@ const API_BASE_PATH = '/api';
 let currentLectureId = 'lecture-12345';
 // Get the DOM elements
 
-chatInput = document.getElementById("chat-input");
-sendButton = document.getElementById("send-button");
-chatWindow = document.getElementById("chat-window");
+const chatInput = document.getElementById("chat-input");
+const sendButton = document.getElementById("send-button");
+const chatWindow = document.getElementById("chat-window");
 const lectureUploadInput = document.getElementById("lecture-upload");
 
 // Handle File Upload Function
@@ -45,14 +45,19 @@ async function handleFileUpload(){
         // Log for verification
         console.log(`Received file: ${file.name}. Content preview: ${fileContent.substring(0, 100)}...`);
 
-        // Simulate the success and re-enable the UI
-        uploadMessage.textContent = `File ${file.name} uploaded successfully`;
+        // Upload the lecture to the API
+        await uploadLecture(file.name, fileContent);
+        
+        // Update the message (uploadLecture function will display its own message)
+        uploadMessage.remove();
     } catch (error){
         console.log("File Upload Error:", error);
         uploadMessage.textContent = `Error: ${error.message}. Please try again.`;
-    } finally {
-        // Re-enable the UI
+        
+        // Re-enable the UI on error
         lectureUploadInput.disabled = false;
+        chatInput.disabled = true;
+        sendButton.disabled = true;
     }
 }
 
@@ -62,6 +67,58 @@ lectureUploadInput.addEventListener('change', handleFileUpload);
 // Initial UI state
 chatInput.disabled = true;
 sendButton.disabled = true;
+
+
+// uploadLecture function to upload the lecture to the API
+async function uploadLecture(fileName, fileContent){
+    // Construct the full URL
+    const uploadUrl = `${API_BASE_PATH}/upload`;
+
+    // Create a new FormData object
+    const formData = new FormData();
+    // Append the file name and content to the form data
+    formData.append('lectureFile', new Blob([fileContent], {type: 'text/plain'}), fileName);
+
+    try {
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formData
+        });
+
+        // Check the HTTP errors
+        if (!response.ok){
+            const errorBody = await response.json();
+            throw new Error(`API Error (${response.status}): ${errorBody.error || errorBody.message || 'Unknown error'}`);
+        }
+
+        // Parsing the JSON body and return the lecture ID
+        const data = await response.json();
+        const newLectureId = data.lectureId;
+
+        if (!newLectureId){
+            throw new Error('Upload failed: No lecture ID returned');
+        }
+        // Store the new lecture ID globally and locally
+        currentLectureId = newLectureId;
+        localStorage.setItem('LectureLens-currentLectureId', newLectureId);
+
+        // Enable the UI
+        chatInput.disabled = false;
+        sendButton.disabled = false;
+        lectureUploadInput.disabled = false;
+        chatInput.focus();
+
+        displayMessage(`Lecture "${fileName}" uploaded successfully! You can now ask questions about the lecture.`, 'system');
+    } catch (error){
+        console.log("Upload Lecture Error:", error);
+        displayMessage(`Error: ${error.message}. Please try again.`, 'system');
+        throw new Error(`Upload failed: ${error.message}`);
+
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+        lectureUploadInput.disabled = false;
+    }
+}
 
 
 // Message Display Function
@@ -97,8 +154,8 @@ async function sendMessage(){
     // ------ This is the loading state ------
 
     // Disable the input and send button immediately after user send messages
-    chatInput.disable = true;
-    sendButton.disable = true;
+    chatInput.disabled = true;
+    sendButton.disabled = true;
 
     // Display the loading assistant response
     const loadingMessage = displayMessage("Thinking...", 'assistant')
@@ -115,8 +172,8 @@ async function sendMessage(){
     } finally {
         // ------ End loading state ------
         // Re-enable the UI
-        chatInput.disable = false;
-        sendButton.disable = false;
+        chatInput.disabled = false;
+        sendButton.disabled = false;
     }
 
 
@@ -148,7 +205,7 @@ async function callChatAPI(message) {
 
     // Check the HTTP errors
     if (!response.ok){
-        const errorBody = await response.json;
+        const errorBody = await response.json();
         throw new Error(`API Error (${response.status}): ${errorBody.error || errorBody.message || 'Unknown error'}`);
     }
 
