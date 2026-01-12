@@ -146,6 +146,21 @@ export class LectureMemory {
       }
     }
 
+    // Get the raw lecture text endpoint
+    if (path === '/raw-lecture-text' && request.method === 'GET'){
+      const rawLectureText = await this.state.storage.get("raw_lecture_text");
+
+      if (rawLectureText){
+        return new Response(JSON.stringify({rawText: rawLectureText}), {
+          headers: {'Content-Type': 'application/json'}
+        });
+      }
+      return new Response(JSON.stringify({error: 'No lecture text found'}), {
+        status: 404,
+        headers: {'Content-Type': 'application/json'}
+      });
+    }
+
     // Fallback
     return new Response("LectureMemory DO is active, but no action matched.", { status: 200 });
   }

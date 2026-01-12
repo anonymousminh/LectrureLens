@@ -7,6 +7,7 @@ const chatInput = document.getElementById("chat-input");
 const sendButton = document.getElementById("send-button");
 const chatWindow = document.getElementById("chat-window");
 const lectureUploadInput = document.getElementById("lecture-upload");
+const summarizeButton = document.getElementById("summarize-button");
 
 // Handle File Upload Function
 async function handleFileUpload(){
@@ -233,6 +234,72 @@ function initializeApp(){
     lectureUploadInput.disabled = false;
 }
 
+// callSummarizeAPI function
+async function callSummerizeAPI(){
+    if (!currentLectureId){
+        displayMessage("Please upload a lecture slide to begin summarization.", 'system');
+        return;
+    }
+
+    // Disable UI during API call
+    chatInput.disabled = true;
+    sendButton.disabled = true;
+    summarizeButton.disabled = true;
+    lectureUploadInput.disabled = true;
+
+    const loadingMessage = displayMessage("Generating summary...", 'system');
+
+    try {
+        // 1. Retrieve the raw lecture text from DO
+        const rawTextUrl = `${API_BASE_PATH}/chat/${currentLectureId}/raw-lecture-text`;
+        const rawTextResponse = await fetch(rawTextUrl);
+
+        if (!rawTextResponse.ok){
+            const errorBody = await rawTextResponse.json();
+            throw new Error(`Failed to retrieve raw lecture text (${rawTextResponse.status}): ${errorBody.error || errorBody.message || 'Unknown error'}`);
+        }
+
+        const rawTextData = await rawTextResponse.json();
+        const lectureContent = rawTextData.rawText;
+
+        if (!lectureContent){
+            throw new Error('Raw lecture content not found in Durable Object.');
+        }
+
+        // 2. Send the raw lecture content to the summarize endpoint
+        const summarizeUrl = `${API_BASE_PATH}/summarize`;
+        const summarizeResponse = await fetch(summarizeUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: lectureContent})
+        });
+
+        if (!summarizeResponse.ok){
+            const errorBody = await summarizeResponse.json();
+            throw new Error(`Failed to summarize lecture content (${summarizeResponse.status}): ${errorBody.error || errorBody.message || 'Unknown error'}`);
+        }
+
+        const summarizeData = await summarizeResponse.json();
+        const summary = summarizeData.summary;
+
+        loadingMessage.textContent = `Lecture Summary: ${summary}`;
+        loadingMessage.classList.remove('system');
+        loadingMessage.classList.add('assistant');
+    } catch (error){
+        console.log("Summarize Error:", error);
+        loadingMessage.textContent = `Error generating summary: ${error.message}. Please try again.`;
+        loadingMessage.classList.add('error');
+    } finally {
+        // Re-enable the UI
+        chatInput.disabled = false;
+        sendButton.disabled = false;
+        summarizeButton.disabled = false;
+        lectureUploadInput.disabled = false;
+        chatInput.focus();
+    }
+}
+
+
 // ----- Event Listeners -----
 sendButton.addEventListener('click', sendMessage);
 chatInput.addEventListener('keypress', function(event) {
@@ -245,6 +312,9 @@ chatInput.addEventListener('keypress', function(event) {
 // Handle File Upload Button Click
 lectureUploadInput.addEventListener('change', handleFileUpload);
 
+// Handle Summarize Button Click
+summarizeButton.addEventListener('click', callSummerizeAPI);
+
 // Initialize the app
 document.addEventListener('DOMContentLoaded', initializeApp);
 
@@ -256,3 +326,5 @@ if (clearButton){
         window.location.reload();
     });
 }
+
+
