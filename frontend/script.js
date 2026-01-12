@@ -1,6 +1,6 @@
 // Use relative path - works with Pages Functions proxy in both dev and production
 const API_BASE_PATH = '/api';
-let currentLectureId = 'lecture-12345';
+let currentLectureId = null;
 // Get the DOM elements
 
 const chatInput = document.getElementById("chat-input");
@@ -60,14 +60,6 @@ async function handleFileUpload(){
         sendButton.disabled = true;
     }
 }
-
-// Handle File Upload Button Click
-lectureUploadInput.addEventListener('change', handleFileUpload);
-
-// Initial UI state
-chatInput.disabled = true;
-sendButton.disabled = true;
-
 
 // uploadLecture function to upload the lecture to the API
 async function uploadLecture(fileName, fileContent){
@@ -217,5 +209,50 @@ async function callChatAPI(message) {
         console.log(`Fetch failed:`, error);
         throw new Error(`Chat failed: ${error.message}`);
     }
-    
+}
+
+// Initialize the current lecture ID
+function initializeApp(){
+    // Try to get the lecture ID from localStorage
+    const storedLectureId = localStorage.getItem('LectureLens-currentLectureId');
+
+    if (storedLectureId){
+        currentLectureId = storedLectureId;
+        displayMessage(`Welcome back! Continuing chat for your last lecture.`, 'system');
+        // Enable the UI
+        chatInput.disabled = false;
+        sendButton.disabled = false;
+        chatInput.focus();
+    } else {
+        displayMessage(`Welcome! Please upload your materials to begin`, 'system');
+        // Disable the UI
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+    }
+    // File upload input is always enabled initially
+    lectureUploadInput.disabled = false;
+}
+
+// ----- Event Listeners -----
+sendButton.addEventListener('click', sendMessage);
+chatInput.addEventListener('keypress', function(event) {
+    if (event.key === 'Enter'){
+        event.preventDefault();
+        sendMessage();
+    }
+});
+
+// Handle File Upload Button Click
+lectureUploadInput.addEventListener('change', handleFileUpload);
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', initializeApp);
+
+// Handle Clear Button Click
+const clearButton = document.getElementById('clear-button');
+if (clearButton){
+    clearButton.addEventListener('click', () => {
+        localStorage.removeItem('LectureLens-currentLectureId');
+        window.location.reload();
+    });
 }

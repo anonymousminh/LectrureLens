@@ -67,3 +67,16 @@ h1 {
 #lecture-upload {
     padding: 10px;
 }
+
+#clear-button {
+    padding: 10px 15px;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#clear-button:hover {
+    background-color: #ff796f;
+}
