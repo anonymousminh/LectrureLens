@@ -8,6 +8,7 @@ const sendButton = document.getElementById("send-button");
 const chatWindow = document.getElementById("chat-window");
 const lectureUploadInput = document.getElementById("lecture-upload");
 const summarizeButton = document.getElementById("summarize-button");
+const extractButton = document.getElementById("extract-button");
 
 // Handle File Upload Function
 async function handleFileUpload(){
@@ -24,9 +25,8 @@ async function handleFileUpload(){
     const uploadMessage = displayMessage(`Uploading and processing "${file.name}"...`, 'system');
 
     // Disable the upload input
+    setUIState(false);
     lectureUploadInput.disabled = true;
-    chatInput.disabled = true;
-    sendButton.disabled = true;
 
     try {
         // Use FileReader to read the file content as text
@@ -47,18 +47,13 @@ async function handleFileUpload(){
         console.log(`Received file: ${file.name}. Content preview: ${fileContent.substring(0, 100)}...`);
 
         // Upload the lecture to the API
-        await uploadLecture(file.name, fileContent);
+        await uploadLecture(file.name, String(fileContent));
         
-        // Update the message (uploadLecture function will display its own message)
-        uploadMessage.remove();
+        // // Update the message (uploadLecture function will display its own message)
+        // uploadMessage.remove();
     } catch (error){
-        console.log("File Upload Error:", error);
-        uploadMessage.textContent = `Error: ${error.message}. Please try again.`;
-        
-        // Re-enable the UI on error
+        displayMessage(`Error reading file: ${error.message}`, 'system');
         lectureUploadInput.disabled = false;
-        chatInput.disabled = true;
-        sendButton.disabled = true;
     }
 }
 
@@ -96,19 +91,13 @@ async function uploadLecture(fileName, fileContent){
         localStorage.setItem('LectureLens-currentLectureId', newLectureId);
 
         // Enable the UI
-        chatInput.disabled = false;
-        sendButton.disabled = false;
-        lectureUploadInput.disabled = false;
-        chatInput.focus();
-
+        setUIState(true);
         displayMessage(`Lecture "${fileName}" uploaded successfully! You can now ask questions about the lecture.`, 'system');
     } catch (error){
         console.log("Upload Lecture Error:", error);
         displayMessage(`Error: ${error.message}. Please try again.`, 'system');
-        throw new Error(`Upload failed: ${error.message}`);
-
-        chatInput.disabled = true;
-        sendButton.disabled = true;
+        setUIState(false);
+    } finally {
         lectureUploadInput.disabled = false;
     }
 }
@@ -147,8 +136,7 @@ async function sendMessage(){
     // ------ This is the loading state ------
 
     // Disable the input and send button immediately after user send messages
-    chatInput.disabled = true;
-    sendButton.disabled = true;
+    setUIState(false);
 
     // Display the loading assistant response
     const loadingMessage = displayMessage("Thinking...", 'assistant')
@@ -160,28 +148,29 @@ async function sendMessage(){
     // Display the AI response
     loadingMessage.textContent = aiResponse;
     } catch (error){
-        console.log("Chat Error:", error);
+        console.error("Chat Error:", error);
         loadingMessage.textContent = `Error: ${error.message}. Please try again.`;
+        loadingMessage.classList.add('error');
     } finally {
         // ------ End loading state ------
         // Re-enable the UI
-        chatInput.disabled = false;
-        sendButton.disabled = false;
+        setUIState(true);
+        chatInput.focus();
     }
 
 
 }
 
-// Handle Send Button Click
-sendButton.addEventListener('click', sendMessage);
+// // Handle Send Button Click
+// sendButton.addEventListener('click', sendMessage);
 
-// Handle Enter Key Press
-chatInput.addEventListener('keypress', function(event) {
-    if (event.key === 'Enter'){
-        event.preventDefault();
-        sendMessage();
-    }
-})
+// // Handle Enter Key Press
+// chatInput.addEventListener('keypress', function(event) {
+//     if (event.key === 'Enter'){
+//         event.preventDefault();
+//         sendMessage();
+//     }
+// })
 
 // callChatAPI function
 async function callChatAPI(message) {
@@ -212,41 +201,9 @@ async function callChatAPI(message) {
     }
 }
 
-// Initialize the current lecture ID
-function initializeApp(){
-    // Try to get the lecture ID from localStorage
-    const storedLectureId = localStorage.getItem('LectureLens-currentLectureId');
-
-    if (storedLectureId){
-        currentLectureId = storedLectureId;
-        displayMessage(`Welcome back! Continuing chat for your last lecture.`, 'system');
-        // Enable the UI
-        chatInput.disabled = false;
-        sendButton.disabled = false;
-        chatInput.focus();
-    } else {
-        displayMessage(`Welcome! Please upload your materials to begin`, 'system');
-        // Disable the UI
-        chatInput.disabled = true;
-        sendButton.disabled = true;
-    }
-    // File upload input is always enabled initially
-    lectureUploadInput.disabled = false;
-}
-
 // callSummarizeAPI function
 async function callSummerizeAPI(){
-    if (!currentLectureId){
-        displayMessage("Please upload a lecture slide to begin summarization.", 'system');
-        return;
-    }
-
-    // Disable UI during API call
-    chatInput.disabled = true;
-    sendButton.disabled = true;
-    summarizeButton.disabled = true;
-    lectureUploadInput.disabled = true;
-
+    setUIState(false);
     const loadingMessage = displayMessage("Generating summary...", 'system');
 
     try {
@@ -291,14 +248,91 @@ async function callSummerizeAPI(){
         loadingMessage.classList.add('error');
     } finally {
         // Re-enable the UI
-        chatInput.disabled = false;
-        sendButton.disabled = false;
-        summarizeButton.disabled = false;
-        lectureUploadInput.disabled = false;
-        chatInput.focus();
+        setUIState(true);
     }
 }
 
+// callExtractAPI function
+async function callExtractAPI(){
+    if (!currentLectureId) return;
+    setUIState(false);
+    const loadingMessage = displayMessage("Extracting concepts...", 'system');
+    
+    try {
+        // 1. Retrieve the raw lecture text from DO
+        const rawTextUrl = `${API_BASE_PATH}/chat/${currentLectureId}/raw-lecture-text`;
+        const rawTextResponse = await fetch(rawTextUrl);
+
+        if (!rawTextResponse.ok){
+            const errorBody = await rawTextResponse.json();
+            throw new Error(`Failed to retrieve raw lecture text (${rawTextResponse.status}): ${errorBody.error || errorBody.message || 'Unknown error'}`);
+        }
+
+        const rawTextData = await rawTextResponse.json();
+        const lectureContent = rawTextData.rawText;
+
+        if (!lectureContent){
+            throw new Error('Raw lecture content not found in Durable Object.');
+        }
+
+        // 2. Send the lectureId to the extract endpoint  
+        const extractUrl = `${API_BASE_PATH}/extract-concepts`;
+        const extractResponse = await fetch(extractUrl, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({lectureId: currentLectureId})
+        });
+
+        if (!extractResponse.ok){
+            const errorBody = await extractResponse.json();
+            throw new Error(`Failed to extract concepts (${extractResponse.status}): ${errorBody.error || errorBody.message || 'Unknown error'}`);
+        }
+
+        const extractData = await extractResponse.json();
+        const concepts = extractData.coreConcepts;
+
+        loadingMessage.textContent = `Extracted Concepts: ${concepts}`;
+        loadingMessage.classList.remove('system');
+        loadingMessage.classList.add('assistant');
+    } catch (error){
+        console.log("Extract Error:", error);
+        loadingMessage.textContent = `Error extracting concepts: ${error.message}. Please try again.`;
+        loadingMessage.classList.add('error');
+    } finally {
+        // Re-enable the UI
+        setUIState(true);
+    }
+}
+
+// setUIState helper function
+function setUIState(enabled){
+    chatInput.disabled = !enabled;
+    sendButton.disabled = !enabled;
+    summarizeButton.disabled = !enabled || !currentLectureId;
+    extractButton.disabled = !enabled || !currentLectureId;
+}
+
+// Initialize the current lecture ID
+function initializeApp(){
+    // Try to get the lecture ID from localStorage
+    const storedLectureId = localStorage.getItem('LectureLens-currentLectureId');
+
+    if (storedLectureId){
+        currentLectureId = storedLectureId;
+        displayMessage(`Welcome back! Continuing chat for your last lecture.`, 'system');
+        // Enable the UI
+        chatInput.disabled = false;
+        sendButton.disabled = false;
+        chatInput.focus();
+    } else {
+        displayMessage(`Welcome! Please upload your materials to begin`, 'system');
+        // Disable the UI
+        chatInput.disabled = true;
+        sendButton.disabled = true;
+    }
+    // File upload input is always enabled initially
+    lectureUploadInput.disabled = false;
+}
 
 // ----- Event Listeners -----
 sendButton.addEventListener('click', sendMessage);
@@ -314,6 +348,10 @@ lectureUploadInput.addEventListener('change', handleFileUpload);
 
 // Handle Summarize Button Click
 summarizeButton.addEventListener('click', callSummerizeAPI);
+
+// Handle Extract Button Click
+extractButton.addEventListener('click', callExtractAPI);
+
 
 // Initialize the app
 document.addEventListener('DOMContentLoaded', initializeApp);

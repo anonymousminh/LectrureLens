@@ -184,6 +184,67 @@ export default {
       }
     }
 
+    // Extract core concepts endpoint
+    // This endpoint will take the lectureId -> retrieve the raw lecture text -> extract the core concepts using Worker AI-> return the core concepts
+    if (path === '/api/extract-concepts' && request.method === 'POST') {
+      try {
+        // Get the lectureId from the request body
+        const { lectureId } = await request.json() as { lectureId: string };
+
+        if (!lectureId) {
+          return addCorsHeaders(new Response('Missing lectureId in request body', { status: 400 }));
+        }
+
+        // Get the Durable Object and stub for the lectureId
+        const id = env.LECTURE_MEMORY.idFromName(lectureId);
+        const stub = env.LECTURE_MEMORY.get(id);
+
+        // Retrieve the raw lecture text from the DO
+        const rawLectureResponse = await stub.fetch("https://do-placeholder/raw-lecture-text");
+        
+        if (!rawLectureResponse.ok) {
+          return addCorsHeaders(new Response('Failed to retrieve lecture text from Durable Object', { status: 500 }));
+        }
+
+        const rawLectureData = await rawLectureResponse.json() as { rawText: string };
+        const rawLectureText = rawLectureData.rawText;
+
+        if (!rawLectureText) {
+          return addCorsHeaders(new Response('No lecture text found', { status: 404 }));
+        }
+
+        // Construct the system prompt for the Worker AI
+        const systemPrompt = "You are a specilized academic assistant. Analyze the following lecture text and extract all key definitions, mathematical formulas, and core theoretical concepts. Format the output clearly using Markdown with bold terms and bullet points";
+        const userPrompt = `Lecture Text:\n\n${rawLectureText}`;
+
+        // Call the Worker AI
+        const model = '@cf/meta/llama-3.1-8b-instruct';
+        const coreConcepts = await env.AI.run(model, {
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ]
+        });
+        
+        const coreConceptsResponse = coreConcepts.response;
+        
+        // Return the core concepts
+        return addCorsHeaders(new Response(JSON.stringify({ coreConcepts: coreConceptsResponse }), {
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      } catch (error) {
+        console.error('Extract concepts error:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return addCorsHeaders(new Response(JSON.stringify({
+          error: 'Failed to extract concepts',
+          details: errorMessage
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+    }
+
     // Handle OPTIONS request (preflight checks)
     if (request.method === 'OPTIONS'){
       return new Response(null, {
