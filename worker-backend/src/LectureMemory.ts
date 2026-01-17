@@ -78,7 +78,7 @@ export class LectureMemory {
         ]
 
         // 10. Call the Workers AI binding
-        const model = '@cf/meta/llama-3.3-70b-instruct-awq';
+        const model = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
         const aiResponse = await this.env.AI.run(model, {messages});
 
         const assistantResponse = aiResponse.response;
