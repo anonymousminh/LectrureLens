@@ -167,17 +167,6 @@ async function sendMessage(){
 
 }
 
-// // Handle Send Button Click
-// sendButton.addEventListener('click', sendMessage);
-
-// // Handle Enter Key Press
-// chatInput.addEventListener('keypress', function(event) {
-//     if (event.key === 'Enter'){
-//         event.preventDefault();
-//         sendMessage();
-//     }
-// })
-
 // callChatAPI function
 async function callChatAPI(message) {
     // Construct the full URL
