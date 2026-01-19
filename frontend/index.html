@@ -10,13 +10,17 @@
 <body>
     <div id="app">
         <h1>LectureLens Study Assistant</h1>
-
-        <div id="chat-window">
-            <!-- Initial messages will be added dynamically by script.js -->
+        <div id="main-content">
+            <div id="lecture-sidebar">
+                <input type="file" id="lecture-upload">
+                <label for="lecture-upload">Upload Lecture</label>
+            </div>
+            <div id="chat-window">
+                <!-- Initial messages will be added dynamically by script.js -->
+            </div>
         </div>
 
         <div id="input-area">
-            <input type="file" id="lecture-upload">
             <input type="text" id="chat-input" placeholder="Ask a question...">
             <button id="summarize-button">Summarize</button>
             <button id="extract-button">Extract Concepts</button>

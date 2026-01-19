@@ -16,6 +16,8 @@ body {
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
     border-radius: 8px;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 h1 {
     background-color: #4CAF50;
@@ -23,13 +25,14 @@ h1 {
     padding: 15px;
     margin: 0;
     font-size: 1.2em;
+    flex-shrink: 0;
 }
 #chat-window {
-    height: 400px;
+    flex: 1;
     padding: 15px;
     overflow-y: auto;
     border-bottom: 1px solid #eee;
-
+    min-height: 0;
 }
 .message {
     padding: 8px 12px;
@@ -48,7 +51,7 @@ h1 {
     display: flex;
     padding: 10px;
     gap: 10px;
-    
+    flex-shrink: 0;
 }
 #chat-input {
     flex-grow: 1;
@@ -67,10 +70,6 @@ h1 {
 
 #send-button:hover{
     background-color: #8fcd91;
-}
-
-#lecture-upload {
-    padding: 10px;
 }
 
 #clear-button {
@@ -126,4 +125,35 @@ h1 {
 /* Ensure bold text stands out */
 .message.assistant strong {
     color: #004d40; 
+}
+
+#main-content {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#lecture-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    background-color: rgb(123, 115, 115);
+    padding: 15px;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+#lecture-upload {
+    padding: 10px;
+    flex-shrink: 0;
+    background-color: rgb(138, 132, 132);
+    border-bottom: 1px solid #ccc;
+    color: white;
+    cursor: pointer;
+}
+
+label{
+    color: white;
 }
