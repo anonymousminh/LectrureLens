@@ -15,6 +15,7 @@ import { LectureMemory } from './LectureMemory';
 interface Env {
   AI: any;
   LECTURE_MEMORY: DurableObjectNamespace;
+  DB: D1Database;
 }
 
 export { LectureMemory };
