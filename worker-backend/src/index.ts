@@ -11,11 +11,12 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 import { LectureMemory } from './LectureMemory';
+import { hashPassword } from './auth';
 
 interface Env {
   AI: any;
   LECTURE_MEMORY: DurableObjectNamespace;
-  DB: D1Database;
+  lecturelens_db: D1Database;
 }
 
 export { LectureMemory };
@@ -128,6 +129,12 @@ export default {
 
     // File Upload Endpoint
     if (path === '/api/upload' && request.method === 'POST') {
+      const userId = request.headers.get("X-User-Id");
+
+      if (!userId){
+        return addCorsHeaders(new Response('Unauthorized', { status: 401 }));
+      }
+
       try {
         // 1. Check the content type to ensure it's a file upload
         const contentType = request.headers.get('Content-Type');
@@ -171,6 +178,9 @@ export default {
           console.log('DO Storage Failed: ', errorText);
           return addCorsHeaders(new Response(`Failed to store lecture in memory: ${errorText}`, { status: 500 }));
         }
+
+        // link the lecture to the user
+        await env.lecturelens_db.prepare('INSERT INTO user_lectures (user_id, lecture_id) VALUES (?, ?)').bind(userId, lectureId).run();
 
         return addCorsHeaders(new Response(JSON.stringify({
           message: 'File received and stored successfully',
@@ -243,6 +253,63 @@ export default {
           status: 500,
           headers: { 'Content-Type': 'application/json' }
         }));
+      }
+    }
+
+    // Signup endpoint
+    if (path === '/api/auth/signup' && request.method === 'POST') {
+      
+        const { email, password } = await request.json() as { email: string, password: string };
+        const { hash, salt } = await hashPassword(password);
+
+        if (!email || !password){
+          return addCorsHeaders(new Response('Missing email or password', { status: 400 }));
+        }
+        try {
+        // Insert the user into the database
+        await env.lecturelens_db.prepare('INSERT INTO users (id, email, password_hash, salt) VALUES (?, ?, ?, ?)').bind(crypto.randomUUID(), email, hash, salt).run();
+
+        return addCorsHeaders(new Response(JSON.stringify({ message: 'User created successfully' }), {
+          headers: { 'Content-Type': 'application/json' },
+        }));
+      } catch (error) {
+        console.error('Signup error:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return addCorsHeaders(new Response(JSON.stringify({
+          error: 'User already exists',
+          details: errorMessage
+        }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }));
+      }
+    }
+
+    // Login endpoint
+    if (path === '/api/auth/login' && request.method === 'POST') {
+      try {
+        const { email, password } = await request.json() as { email: string, password: string };
+
+        if (!email || !password){
+          return addCorsHeaders(new Response('Missing email or password', { status: 400 }));
+        }
+
+        const user = await env.lecturelens_db.prepare('SELECT id, email, password_hash, salt FROM users WHERE email = ?').bind(email).first();
+
+        if (!user) return addCorsHeaders(new Response('Invalid credentials', { status: 401 }));
+
+        const {hash} = await hashPassword(password, user.salt as string);
+
+        if (hash === user.password_hash){
+          return addCorsHeaders(new Response(JSON.stringify({
+             token: user.id, message: 'Login successful' 
+            }), {status: 200, headers: { 'Content-Type': 'application/json' }}));
+        } else {
+          return addCorsHeaders(new Response('Invalid credentials', { status: 401 }));
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        return addCorsHeaders(new Response('Internal Server Error', { status: 500 }));
       }
     }
 
