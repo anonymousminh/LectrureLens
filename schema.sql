@@ -12,3 +12,11 @@ CREATE TABLE user_lectures (
     lecture_id TEXT,
     PRIMARY KEY (user_id, lecture_id)
 );
+
+CREATE TABLE sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);

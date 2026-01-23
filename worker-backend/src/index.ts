@@ -27,7 +27,7 @@ function addCorsHeaders(response: Response): Response {
   const newHeaders = new Headers(response.headers);
   newHeaders.set('Access-Control-Allow-Origin', '*');
   newHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type');
+  newHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   return new Response(response.body, {
     status: response.status,
@@ -112,20 +112,22 @@ export default {
         return addCorsHeaders(new Response('Unauthorized', { status: 401 }));
       }
 
-      // --- AUTHORIZATION (Ownership Check) ---
-      const segments = path.split('/').filter(Boolean);
-      const lectureId = segments[segments.length - 1];
-
-      const ownership = await env.lecturelens_db.prepare('SELECT user_id FROM user_lectures WHERE user_id = ? AND lecture_id = ?').bind(userId, lectureId).first();
-      if (!ownership){
-        return addCorsHeaders(new Response('Forbidden: You do not have access to this lecture.', { status: 403 }));
-      }
-
       try {
-        const { text } = await request.json() as { text?: string };
+        // Parse request body to get text and lectureId
+        const { text, lectureId } = await request.json() as { text?: string, lectureId?: string };
 
         if (!text) {
           return addCorsHeaders(new Response('Missing "text" in request body', { status: 400 }));
+        }
+
+        if (!lectureId) {
+          return addCorsHeaders(new Response('Missing "lectureId" in request body', { status: 400 }));
+        }
+
+        // --- AUTHORIZATION (Ownership Check) ---
+        const ownership = await env.lecturelens_db.prepare('SELECT user_id FROM user_lectures WHERE user_id = ? AND lecture_id = ?').bind(userId, lectureId).first();
+        if (!ownership){
+          return addCorsHeaders(new Response('Forbidden: You do not have access to this lecture.', { status: 403 }));
         }
 
         const systemPrompt = "You are a helpful study assistant. Summarize the following lecture transcript into clear, structured key points. Use Markdown formatting for readability.";
@@ -153,8 +155,7 @@ export default {
 
     // UPLOAD FILE ENDPOINT
     if (path === '/api/upload' && request.method === 'POST') {
-      const userId = request.headers.get("X-User-Id");
-
+      const userId = await validateSession(request, env.lecturelens_db);
       if (!userId){
         return addCorsHeaders(new Response('Unauthorized', { status: 401 }));
       }
@@ -295,11 +296,35 @@ export default {
     if (path === '/api/auth/signup' && request.method === 'POST') {
       
         const { email, password } = await request.json() as { email: string, password: string };
+
+        // Validate the email format
+        if (!email.includes('@') || !email.includes('.')){
+          return addCorsHeaders(new Response('Invalid email format', { status: 400 }));
+        }
+
+        // Check email length limits
+        if (email.length < 3 || email.length > 254){
+          return addCorsHeaders(new Response('Invalid email length', { status: 400 }));
+        }
+
+        // Check password length limits
+        if (password.length < 8 || password.length > 100){
+          return addCorsHeaders(new Response('Invalid password length', { status: 400 }));
+        }
+
+        // Check password complexity
+        if (!password.match(/[A-Z]/g) || !password.match(/[a-z]/g) || !password.match(/[0-9]/g) || !password.match(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/g)){
+          return addCorsHeaders(new Response('Invalid password complexity', { status: 400 }));
+        }
+
+        // Check if the email is already in use
+        const existingUser = await env.lecturelens_db.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+        if (existingUser){
+          return addCorsHeaders(new Response('Email already in use', { status: 400 }));
+        }
+
         const { hash, salt } = await hashPassword(password);
 
-        if (!email || !password){
-          return addCorsHeaders(new Response('Missing email or password', { status: 400 }));
-        }
         try {
         // Insert the user into the database
         await env.lecturelens_db.prepare('INSERT INTO users (id, email, password_hash, salt) VALUES (?, ?, ?, ?)').bind(crypto.randomUUID(), email, hash, salt).run();
@@ -309,12 +334,10 @@ export default {
         }));
       } catch (error) {
         console.error('Signup error:', error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
         return addCorsHeaders(new Response(JSON.stringify({
-          error: 'User already exists',
-          details: errorMessage
+          error: 'An error occurred during signup'
         }), {
-          status: 400,
+          status: 500,
           headers: { 'Content-Type': 'application/json' }
         }));
       }
@@ -329,19 +352,49 @@ export default {
           return addCorsHeaders(new Response('Missing email or password', { status: 400 }));
         }
 
+        // Validate the email format
+        if (!email.includes('@') || !email.includes('.')){
+          return addCorsHeaders(new Response('Invalid email format', { status: 400 }));
+        }
+
+        // Check email length limits
+        if (email.length < 3 || email.length > 254){
+          return addCorsHeaders(new Response('Invalid email length', { status: 400 }));
+        }
+
+        // Basic password  length validation
+        if (password.length < 8 || password.length > 100){
+          return addCorsHeaders(new Response('Invalid password length', { status: 400 }));
+        }
+
+        // Query for user
         const user = await env.lecturelens_db.prepare('SELECT id, email, password_hash, salt FROM users WHERE email = ?').bind(email).first();
+        
+        // Always hash the password to prevent timing attacks, even if user doesn't exist
+        // Use a dummy salt if user not found
+        const dummySalt = '0000000000000000000000000000000000000000000000000000000000000000';
+        const saltToUse = user ? (user.salt as string) : dummySalt;
+        const {hash} = await hashPassword(password, saltToUse);
 
-        if (!user) return addCorsHeaders(new Response('Invalid credentials', { status: 401 }));
-
-        const {hash} = await hashPassword(password, user.salt as string);
-
-        if (hash === user.password_hash){
-          return addCorsHeaders(new Response(JSON.stringify({
-             token: user.id, message: 'Login successful' 
-            }), {status: 200, headers: { 'Content-Type': 'application/json' }}));
-        } else {
+        // Check if user exists and password matches
+        if (!user || hash !== user.password_hash){
           return addCorsHeaders(new Response('Invalid credentials', { status: 401 }));
         }
+
+        // Generate a new token and store it in the database
+        const token = crypto.randomUUID();
+
+        // Calculate the expiration date (1 day from now)
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        await env.lecturelens_db.prepare('INSERT INTO sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)').bind(token, user.id, new Date().toISOString(), expiresAt.toISOString()).run();
+
+        // Return the token to the client
+        return addCorsHeaders(new Response(JSON.stringify({
+          token: token,
+          message: 'Login successful',
+          expiresAt: expiresAt.toISOString()
+        }), {status: 200, headers: { 'Content-Type': 'application/json' }}));
       } catch (error) {
         console.error('Login error:', error);
         return addCorsHeaders(new Response('Internal Server Error', { status: 500 }));
@@ -369,13 +422,33 @@ export default {
       }
     }
 
+    // LOGOUT ENDPOINT
+    if (path === '/api/auth/logout' && request.method === 'POST') {
+      // --- VALIDATE SESSION ---
+      const userId = await validateSession(request, env.lecturelens_db);
+      if (!userId){
+        return addCorsHeaders(new Response('Unauthorized', { status: 401 }));
+      }
+
+      try {
+      // Delete the session from the database
+      await env.lecturelens_db.prepare('DELETE FROM sessions WHERE token = ?').bind(request.headers.get('Authorization')?.split(' ')[1]).run();
+
+      // Return a success response
+      return addCorsHeaders(new Response(JSON.stringify({ message: 'Logout successful' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      } catch (error) {
+        console.error('Logout error:', error);
+        return addCorsHeaders(new Response('Internal Server Error', { status: 500 }));
+      }
+    }
+
     // Handle OPTIONS request (preflight checks)
     if (request.method === 'OPTIONS'){
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         },
       });
     }
