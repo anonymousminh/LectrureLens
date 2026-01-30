@@ -10,11 +10,11 @@ body {
 }
 #main-app {
     width: 100%;
-    max-width: 1200px;
-    height: 90vh;
+    min-width: 100vh;
+    height: 100vh;
     background-color: white;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    border-radius: 8px;
+    border-radius: 0%;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -28,11 +28,12 @@ h1 {
     flex-shrink: 0;
 }
 #chat-window {
-    flex: 1;
+    flex: 1 1 auto;
     padding: 15px;
     overflow-y: auto;
     border-bottom: 1px solid #eee;
     min-height: 0;
+    min-width: 0;
 }
 .message {
     padding: 8px 12px;
@@ -52,6 +53,7 @@ h1 {
     padding: 10px;
     gap: 10px;
     flex-shrink: 0;
+    margin-top: auto;
 }
 #chat-input {
     flex-grow: 1;
@@ -129,20 +131,20 @@ h1 {
 
 #main-content {
     display: flex;
-    flex-direction: row;
-    flex: 1;
+    flex: 1 1 auto;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
 }
 
 #lecture-sidebar {
-    width: 300px;
+    width: 250px;
     flex-shrink: 0;
     background-color: rgb(123, 115, 115);
     padding: 15px;
     border-right: 1px solid #ccc;
     overflow-y: auto;
-    min-height: 0;
+    height: 83vh;
 }
 
 #lecture-upload {
@@ -158,3 +160,62 @@ label{
     color: white;
 }
 
+#auth-container {
+    width: 70vh;
+    height: 100vh;
+    background-color: #f4f4f9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 100px;
+}
+
+#auth-box{
+    width: 50vh;
+    height: 50vh;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#auth-title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-align: center;
+    color: white;
+}
+
+#auth-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+#auth-toggle-link {
+    font-size: 14px;
+    margin-top: 20px;
+    color: #666;
+    text-align: center;
+}
+
+#auth-email, #auth-password {
+    width: 70%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#auth-button {
+    width: 20%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#auth-button:hover {
+    background-color: #8fcd91;
+}
