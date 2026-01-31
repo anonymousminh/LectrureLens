@@ -322,8 +322,83 @@ export default {
           }));
         }
 
-        // 4. Read the file content as text
+        // 4. Validate file size (50MB limit for uploaded content)
+        const maxFileSize = 50 * 1024 * 1024; // 50MB
+        if (file.size > maxFileSize) {
+          return addCorsHeaders(new Response(JSON.stringify({ 
+            error: 'File too large',
+            message: 'Uploaded file exceeds the maximum size of 50MB.',
+            maxSize: '50MB'
+          }), { 
+            status: 413,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+
+        // 5. Validate file name and detect file type
+        const fileName = file.name || 'unknown';
+        const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
+        const isValidExtension = ['txt', 'pdf'].includes(fileExtension);
+        
+        if (!isValidExtension) {
+          return addCorsHeaders(new Response(JSON.stringify({ 
+            error: 'Invalid file type',
+            message: 'Only PDF and TXT files are supported.',
+            receivedExtension: fileExtension
+          }), { 
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+
+        // 6. Read the file content as text
         const lectureText = await file.text();
+
+        // 7. Validate the extracted text content
+        if (!lectureText || lectureText.trim().length === 0) {
+          return addCorsHeaders(new Response(JSON.stringify({ 
+            error: 'Empty file',
+            message: 'The uploaded file contains no text content. If this is a PDF, it may be image-only or corrupted.'
+          }), { 
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+
+        // 8. Validate text length (max 10 million characters ~ 2-3 million words)
+        const maxTextLength = 10_000_000;
+        if (lectureText.length > maxTextLength) {
+          return addCorsHeaders(new Response(JSON.stringify({ 
+            error: 'Content too large',
+            message: `Extracted text is too large (${lectureText.length} characters). Maximum is ${maxTextLength} characters.`,
+            extractedLength: lectureText.length,
+            maxLength: maxTextLength
+          }), { 
+            status: 413,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+
+        // 9. Basic content validation - ensure it's reasonable text
+        const minTextLength = 10; // At least 10 characters
+        if (lectureText.trim().length < minTextLength) {
+          return addCorsHeaders(new Response(JSON.stringify({ 
+            error: 'Content too short',
+            message: `The file content is too short (${lectureText.trim().length} characters). Please upload a file with meaningful content.`
+          }), { 
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+
+        // Log file statistics for monitoring
+        console.log('File upload:', {
+          fileName,
+          fileType: fileExtension,
+          originalSize: file.size,
+          textLength: lectureText.length,
+          userId
+        });
 
         // After read the file content as text, we will generate a unique ID for it
         const lectureId = crypto.randomUUID();
@@ -352,16 +427,44 @@ export default {
         // link the lecture to the user
         await env.lecturelens_db.prepare('INSERT INTO user_lectures (user_id, lecture_id) VALUES (?, ?)').bind(userId, lectureId).run();
 
+        // Return success with detailed metadata
         return addCorsHeaders(new Response(JSON.stringify({
           message: 'File received and stored successfully',
           lectureId: lectureId,
           fileName: file.name,
+          fileType: fileExtension,
+          textLength: lectureText.length,
+          wordCount: lectureText.trim().split(/\s+/).length,
+          uploadedAt: new Date().toISOString()
         }), {
+          status: 200,
           headers: { 'Content-Type': 'application/json' },
         }));
       } catch (error) {
         console.error('File Upload Error:', error);
-        return addCorsHeaders(new Response(JSON.stringify({ error: 'Internal Server Error during file upload.' }), { 
+        
+        // Provide more detailed error information
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorDetails: any = {
+          error: 'File upload failed',
+          message: 'An error occurred while processing your file.'
+        };
+
+        // Add specific error details if available
+        if (errorMessage.includes('size')) {
+          errorDetails.message = 'File size validation failed.';
+        } else if (errorMessage.includes('parse') || errorMessage.includes('form')) {
+          errorDetails.message = 'Failed to parse the uploaded file.';
+        } else if (errorMessage.includes('Durable Object')) {
+          errorDetails.message = 'Failed to store the lecture content.';
+        }
+
+        // Include error details in development/debugging
+        if (errorMessage) {
+          errorDetails.details = errorMessage;
+        }
+
+        return addCorsHeaders(new Response(JSON.stringify(errorDetails), { 
           status: 500,
           headers: { 'Content-Type': 'application/json' }
         }));
