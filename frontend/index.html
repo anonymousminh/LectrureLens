@@ -6,6 +6,8 @@
     <title>LectureLens</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- PDF.js library for PDF text extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
     <!-- Auth App -->
@@ -26,11 +28,12 @@
         <h1>LectureLens Study Assistant</h1>
         <div id="main-content">
             <div id="lecture-sidebar">
-                <input type="file" id="lecture-upload">
-                <label for="lecture-upload">Upload Lecture</label>
+                <input type="file" id="lecture-upload" accept=".txt,.pdf,application/pdf,text/plain">
+                <label for="lecture-upload">Upload Lecture (PDF or TXT)</label>
             </div>
             <div id="chat-window">
                 <!-- Initial messages will be added dynamically by script.js -->
+                <button id="scroll-to-bottom" title="Scroll to bottom">↓</button>
             </div>
         </div>
 
