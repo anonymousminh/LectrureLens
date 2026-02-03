@@ -40,6 +40,10 @@ const lectureUploadInput = document.getElementById("lecture-upload");
 const summarizeButton = document.getElementById("summarize-button");
 const extractButton = document.getElementById("extract-button");
 const scrollToBottomBtn = document.getElementById("scroll-to-bottom");
+ // Lecture list elements
+const lectureList = document.getElementById("lecture-list");
+const lectureListEmpty = document.getElementById("lecture-list-empty");
+let lecturesData = []; // Store fetched lectures
 
 // Handle Auth Toggle Mode
 function toggleAuthMode(mode){
@@ -465,6 +469,10 @@ async function uploadLecture(fileName, fileContent){
         setUIState(true);
         displayMessage(successMessage, 'system');
         
+        // Refresh the lecture list to show the new upload
+        await fetchLectureList();
+        updateSelectedLecture();
+        
         // Log upload details to console for debugging
         console.log('Upload successful:', {
             lectureId: newLectureId,
@@ -848,6 +856,196 @@ function setUIState(enabled){
     extractButton.disabled = !enabled || !currentLectureId;
 }
 
+// ===== LECTURE LIST FUNCTIONS =====
+
+// Fetch lectures from the API
+async function fetchLectureList() {
+    try {
+        const response = await fetch(`${API_BASE_PATH}/my-lectures`, {
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (response.status === 401) {
+            handleUnauthorized();
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch lectures');
+        }
+
+        const data = await response.json();
+        lecturesData = data.lectures || [];
+        renderLectureList();
+    } catch (error) {
+        console.error('Error fetching lectures:', error);
+        lecturesData = [];
+        renderLectureList();
+    }
+}
+
+// Render the lecture list in the sidebar
+function renderLectureList() {
+    // Clear existing list
+    lectureList.innerHTML = '';
+
+    if (lecturesData.length === 0) {
+        lectureList.style.display = 'none';
+        lectureListEmpty.style.display = 'flex';
+        return;
+    }
+
+    lectureList.style.display = 'block';
+    lectureListEmpty.style.display = 'none';
+
+    lecturesData.forEach(lecture => {
+        const lectureItem = createLectureItem(lecture);
+        lectureList.appendChild(lectureItem);
+    });
+
+    // Highlight the currently selected lecture
+    updateSelectedLecture();
+}
+
+// Create a single lecture list item element
+function createLectureItem(lecture) {
+    const item = document.createElement('div');
+    item.classList.add('lecture-item');
+    item.dataset.lectureId = lecture.lecture_id;
+
+    // Lecture name (truncate if too long)
+    const lectureName = lecture.lecture_name || 'Untitled Lecture';
+    const displayName = lectureName.length > 25 ? lectureName.substring(0, 22) + '...' : lectureName;
+
+    // Format date
+    const createdAt = lecture.created_at ? formatDate(lecture.created_at) : 'Unknown date';
+
+    item.innerHTML = `
+        <div class="lecture-item-content">
+            <div class="lecture-item-name" title="${lectureName}">${displayName}</div>
+            <div class="lecture-item-meta">
+                <span class="lecture-item-date">${createdAt}</span>
+            </div>
+        </div>
+        <button class="lecture-item-delete" title="Delete lecture">&times;</button>
+    `;
+
+    // Click to select lecture
+    item.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('lecture-item-delete')) {
+            selectLecture(lecture.lecture_id, lectureName);
+        }
+    });
+
+    // Delete button
+    const deleteBtn = item.querySelector('.lecture-item-delete');
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteLecture(lecture.lecture_id, lectureName);
+    });
+
+    return item;
+}
+
+// Format date for display
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+        return 'Today';
+    } else if (diffDays === 1) {
+        return 'Yesterday';
+    } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+    } else {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+}
+
+// Select a lecture
+function selectLecture(lectureId, lectureName) {
+    currentLectureId = lectureId;
+    localStorage.setItem('LectureLens-currentLectureId', lectureId);
+    
+    // Update UI
+    updateSelectedLecture();
+    setUIState(true);
+    
+    // Clear chat and show selection message
+    chatWindow.innerHTML = '<button id="scroll-to-bottom" title="Scroll to bottom">↓</button>';
+    displayMessage(`Selected: "${lectureName}". You can now ask questions about this lecture.`, 'system');
+    
+    // Re-attach scroll button listener
+    const newScrollBtn = document.getElementById('scroll-to-bottom');
+    newScrollBtn.addEventListener('click', scrollToBottom);
+}
+
+// Update visual selection in the lecture list
+function updateSelectedLecture() {
+    // Remove active class from all items
+    document.querySelectorAll('.lecture-item').forEach(item => {
+        item.classList.remove('active');
+    });
+
+    // Add active class to selected item
+    if (currentLectureId) {
+        const selectedItem = document.querySelector(`.lecture-item[data-lecture-id="${currentLectureId}"]`);
+        if (selectedItem) {
+            selectedItem.classList.add('active');
+        }
+    }
+}
+
+// Delete a lecture
+async function deleteLecture(lectureId, lectureName) {
+    if (!confirm(`Are you sure you want to delete "${lectureName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE_PATH}/lectures/${lectureId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+
+        if (response.status === 401) {
+            handleUnauthorized();
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error('Failed to delete lecture');
+        }
+
+        // Remove from local data
+        lecturesData = lecturesData.filter(l => l.lecture_id !== lectureId);
+        
+        // If deleted lecture was the current one, clear selection
+        if (currentLectureId === lectureId) {
+            currentLectureId = null;
+            localStorage.removeItem('LectureLens-currentLectureId');
+            setUIState(false);
+            chatWindow.innerHTML = '<button id="scroll-to-bottom" title="Scroll to bottom">↓</button>';
+            displayMessage('Lecture deleted. Please select or upload another lecture.', 'system');
+            
+            // Re-attach scroll button listener
+            const newScrollBtn = document.getElementById('scroll-to-bottom');
+            newScrollBtn.addEventListener('click', scrollToBottom);
+        }
+
+        // Re-render the list
+        renderLectureList();
+        displayMessage(`"${lectureName}" has been deleted.`, 'system');
+
+    } catch (error) {
+        console.error('Error deleting lecture:', error);
+        displayMessage(`Error deleting lecture: ${error.message}`, 'error');
+    }
+}
+
 // Initialize the current lecture ID
 function initializeApp(){
     // Check for the auth token first
@@ -863,16 +1061,19 @@ function initializeApp(){
     authToken = storedToken;
     showMainApp();
 
+    // Fetch the user's lectures
+    fetchLectureList();
 
     // Try to get the lecture ID from localStorage
     const storedLectureId = localStorage.getItem('LectureLens-currentLectureId');
 
     if (storedLectureId){
         currentLectureId = storedLectureId;
-        displayMessage(`Welcome back! Continuing chat for your last lecture.`, 'system');
+        // Find lecture name from the list (will be validated after fetch)
+        displayMessage(`Welcome back! Loading your lectures...`, 'system');
         setUIState(true);
     } else {
-        displayMessage(`Welcome! Please upload your materials to begin`, 'system');
+        displayMessage(`Welcome! Please upload or select a lecture to begin`, 'system');
         setUIState(false);
     }
     // File upload input is always enabled initially
