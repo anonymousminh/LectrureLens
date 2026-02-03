@@ -3,25 +3,25 @@
  * 
  * This function acts as a proxy to forward all /api/* requests
  * to the Worker backend via Service Binding.
- * 
- * The [[path]] catch-all captures everything after /api/
- * For example: /api/chat/lecture-123 -> forwards to Worker
  */
 
-interface Env {
-  WORKER_BACKEND: {
-    fetch(request: Request): Promise<Response>;
-  };
-}
-
-export async function onRequest(context: { request: Request; env: Env }) {
+export async function onRequest(context) {
   const { request, env } = context;
+  
+  // Check if Service Binding is available
+  if (!env.WORKER_BACKEND) {
+    return new Response(JSON.stringify({
+      error: 'Service binding WORKER_BACKEND not configured',
+      hint: 'Add a Service Binding in Cloudflare Dashboard: Pages > Settings > Functions > Service bindings'
+    }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
   
   try {
     // Forward the request to the Worker backend via Service Binding
-    // The Service Binding automatically handles the request routing
     const response = await env.WORKER_BACKEND.fetch(request);
-    
     return response;
   } catch (error) {
     console.error('Error calling Worker backend:', error);
@@ -34,4 +34,3 @@ export async function onRequest(context: { request: Request; env: Env }) {
     });
   }
 }
-
