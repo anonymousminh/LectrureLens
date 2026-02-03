@@ -29,8 +29,22 @@
         <h1>LectureLens Study Assistant</h1>
         <div id="main-content">
             <div id="lecture-sidebar">
-                <input type="file" id="lecture-upload" accept=".txt,.pdf,application/pdf,text/plain">
-                <label for="lecture-upload">Upload Your Lecture Here</label>
+                <div id="sidebar-header">
+                    <h2>My Lectures</h2>
+                </div>
+                <div id="upload-section">
+                    <input type="file" id="lecture-upload" accept=".txt,.pdf,application/pdf,text/plain">
+                    <label for="lecture-upload">+ Upload New Lecture</label>
+                </div>
+                <div id="lecture-list-container">
+                    <div id="lecture-list">
+                        <!-- Lecture items will be dynamically added here -->
+                    </div>
+                    <div id="lecture-list-empty">
+                        <p>No lectures yet</p>
+                        <p class="empty-hint">Upload a PDF or TXT file to get started</p>
+                    </div>
+                </div>
             </div>
             <div id="chat-container">
                 <div id="chat-window">
