@@ -22,7 +22,8 @@ async function parseErrorResponse(response) {
     }
 }
 
-// Get the DOM elements for the auth form
+// Get the DOM elements for the auth form and landing page
+const landingPage = document.getElementById("landing-page");
 const authContainer = document.getElementById("auth-container");
 const authForm = document.getElementById("auth-form");
 const authTitle = document.getElementById("auth-title");
@@ -250,6 +251,14 @@ function showMainApp(){
 
 // Show Auth Container Function
 function showAuthContainer(){
+    if (landingPage) landingPage.style.display = 'none';
+    authContainer.style.display = 'flex';
+    mainApp.style.display = 'none';
+}
+
+// Transition from landing page to auth (Get Started click)
+function showLandingToAuth(){
+    if (landingPage) landingPage.style.display = 'none';
     authContainer.style.display = 'flex';
     mainApp.style.display = 'none';
 }
@@ -1052,8 +1061,7 @@ function initializeApp(){
     const storedToken = localStorage.getItem('LectureLens-authToken');
 
     if (!storedToken){
-        // No token, show auth screen
-        showAuthContainer();
+        // No token, show landing page (auth hidden by default); user clicks Get Started to show auth
         return;
     }
 
@@ -1106,6 +1114,12 @@ authToggleLink.addEventListener('click', function(event) {
     if (event.target.tagName === 'A'){
         toggleAuthMode();
     }
+});
+
+// Landing page Get Started buttons
+['landing-get-started', 'hero-cta', 'how-cta'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.addEventListener('click', showLandingToAuth);
 });
 
 // Initialize the app

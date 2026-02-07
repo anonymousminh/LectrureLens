@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LectureLens</title>
+    <title>LectureLens – AI Study Assistant for Your Lectures</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- PDF.js library for PDF text extraction -->
@@ -11,8 +14,70 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script> <!-- For sanitizing HTML -->
 </head>
 <body>
+    <!-- Landing Page -->
+    <div id="landing-page">
+        <header class="landing-header">
+            <div class="landing-logo">LectureLens</div>
+            <nav class="landing-nav">
+                <a href="#features">Features</a>
+                <a href="#how-it-works">How it works</a>
+                <button id="landing-get-started" class="btn-primary">Get Started Free</button>
+            </nav>
+        </header>
+
+        <section class="landing-hero">
+            <h1 class="hero-title">Your lecture PDFs,<br><em>explained by AI</em></h1>
+            <p class="hero-subtitle">Upload your notes or slides, get instant summaries, extract key concepts, and ask questions—all in one place. Study smarter, not harder.</p>
+            <button id="hero-cta" class="btn-primary btn-large">Get Started Free</button>
+        </section>
+
+        <section id="features" class="landing-features">
+            <h2 class="section-title">Everything you need to master your lectures</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📄</div>
+                    <h3>Upload PDFs & Notes</h3>
+                    <p>Drop your lecture PDFs or TXT files. LectureLens reads and indexes everything so you can query it anytime.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✂️</div>
+                    <h3>Summarize & Extract</h3>
+                    <p>Get concise summaries and extract key concepts in one click. No more flipping through pages.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💬</div>
+                    <h3>Chat with Your Lectures</h3>
+                    <p>Ask questions in plain English. Get answers grounded in your uploaded content—like having a tutor on demand.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="how-it-works" class="landing-how">
+            <h2 class="section-title">How it works</h2>
+            <div class="landing-steps">
+                <div class="landing-step">
+                    <span class="landing-step-num">1</span>
+                    <p><strong>Sign up</strong> and create your account.</p>
+                </div>
+                <div class="landing-step">
+                    <span class="landing-step-num">2</span>
+                    <p><strong>Upload</strong> your lecture PDFs or TXT files.</p>
+                </div>
+                <div class="landing-step">
+                    <span class="landing-step-num">3</span>
+                    <p><strong>Summarize, extract, or chat</strong>—get answers in seconds.</p>
+                </div>
+            </div>
+            <button id="how-cta" class="btn-primary btn-large">Try LectureLens Now</button>
+        </section>
+
+        <footer class="landing-footer">
+            <p>LectureLens – AI-powered study assistant for students.</p>
+        </footer>
+    </div>
+
     <!-- Auth App -->
-     <div id="auth-container">
+     <div id="auth-container" style="display: none;">
         <div id="auth-box">
             <h1 id="auth-title">Login to LectureLens</h1>
             <form id="auth-form">
