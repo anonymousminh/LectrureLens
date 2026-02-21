@@ -260,7 +260,7 @@ export default {
         const model = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
         // For long documents, split into chunks and summarize each, then combine
-        const MAX_CHARS_PER_CHUNK = 12000; // ~3000 tokens per chunk (safe for context window)
+        const MAX_CHARS_PER_CHUNK = 12000; // ~3000 tokens per chunk
         let summary: string;
 
         if (text.length <= MAX_CHARS_PER_CHUNK) {
