@@ -47,6 +47,9 @@ const scrollToBottomBtn = document.getElementById("scroll-to-bottom");
  // Lecture list elements
 const lectureList = document.getElementById("lecture-list");
 const lectureListEmpty = document.getElementById("lecture-list-empty");
+const currentLectureLabel = document.getElementById("current-lecture-label");
+const sidebarToggle = document.getElementById("sidebar-toggle");
+const lectureSidebar = document.getElementById("lecture-sidebar");
 let lecturesData = []; // Store fetched lectures
 
 // Handle Auth Toggle Mode
@@ -58,15 +61,15 @@ function toggleAuthMode(mode){
     isLoginMode = !isLoginMode;
 
     if (isLoginMode){
-        // Switch to login mode
-        authTitle.textContent = "Login to LectureLens";
-        authButton.textContent = "Login";
+        authTitle.textContent = "Welcome back";
+        document.querySelector('.auth-subtitle').textContent = "Sign in to continue to your lectures";
+        authButton.textContent = "Sign in";
         authToggleLink.innerHTML = "Don't have an account? <a href='#'>Sign up</a>";
     } else {
-        // Switch to signup mode
-        authTitle.textContent = "Create an Account";
-        authButton.textContent = "Sign Up";
-        authToggleLink.innerHTML = "Already have an account? <a href='#'>Login</a>";
+        authTitle.textContent = "Create your account";
+        document.querySelector('.auth-subtitle').textContent = "Start studying smarter with AI";
+        authButton.textContent = "Create account";
+        authToggleLink.innerHTML = "Already have an account? <a href='#'>Sign in</a>";
     }
 
     // Clear input fields
@@ -234,6 +237,9 @@ async function logoutUser(){
     authContainer.style.display = 'flex';
     mainApp.style.display = 'none';
 
+    // Reset header label
+    if (currentLectureLabel) currentLectureLabel.textContent = 'No lecture selected';
+
     // Clear chat window
     chatWindow.innerHTML = '';
 }
@@ -261,7 +267,7 @@ async function handleAuthFormSubmit(event){
     authPassword.disabled = true;
     authButton.disabled = true;
     authButton.classList.add('loading');
-    authButton.textContent = isLoginMode ? 'Logging in...' : 'Creating account...';
+    authButton.textContent = isLoginMode ? 'Signing in...' : 'Creating account...';
 
     try {
         let response;
@@ -316,7 +322,7 @@ async function handleAuthFormSubmit(event){
         authPassword.disabled = false;
         authButton.disabled = false;
         authButton.classList.remove('loading');
-        authButton.textContent = isLoginMode ? 'Login' : 'Sign Up';
+        authButton.textContent = isLoginMode ? 'Sign in' : 'Create account';
     }
 }
 
@@ -1064,9 +1070,15 @@ function selectLecture(lectureId, lectureName) {
     // Update UI
     updateSelectedLecture();
     setUIState(true);
+    if (currentLectureLabel) currentLectureLabel.textContent = lectureName;
+    
+    // On mobile, auto-close sidebar after selection
+    if (window.innerWidth <= 768 && lectureSidebar) {
+        lectureSidebar.classList.remove('open');
+    }
     
     // Clear chat and show selection message
-    chatWindow.innerHTML = '<button id="scroll-to-bottom" title="Scroll to bottom">↓</button>';
+    chatWindow.innerHTML = '<button id="scroll-to-bottom" title="Scroll to bottom"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>';
     displayMessage(`Selected: "${lectureName}". You can now ask questions about this lecture.`, 'system');
     
     // Re-attach scroll button listener
@@ -1119,7 +1131,8 @@ async function deleteLecture(lectureId, lectureName) {
             currentLectureId = null;
             localStorage.removeItem('LectureLens-currentLectureId');
             setUIState(false);
-            chatWindow.innerHTML = '<button id="scroll-to-bottom" title="Scroll to bottom">↓</button>';
+            if (currentLectureLabel) currentLectureLabel.textContent = 'No lecture selected';
+            chatWindow.innerHTML = '<button id="scroll-to-bottom" title="Scroll to bottom"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>';
             displayMessage('Lecture deleted. Please select or upload another lecture.', 'system');
             
             // Re-attach scroll button listener
@@ -1203,6 +1216,13 @@ authToggleLink.addEventListener('click', function(event) {
     const btn = document.getElementById(id);
     if (btn) btn.addEventListener('click', showLandingToAuth);
 });
+
+// Sidebar toggle for mobile
+if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+        if (lectureSidebar) lectureSidebar.classList.toggle('open');
+    });
+}
 
 // Initialize the app and Google Sign-In
 document.addEventListener('DOMContentLoaded', () => {
